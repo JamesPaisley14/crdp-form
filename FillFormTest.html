@@ -1,0 +1,130 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script src="./pdf-lib.js"></script>
+    <script src="https://unpkg.com/downloadjs@1.4.7"></script>
+  </head>
+
+  <body>
+    <p>Click the button to fill form fields in an existing PDF document with <code>pdf-lib</code></p>
+    <button onclick="fillForm()">Fill PDF</button>
+    <p class="small">(Your browser will download the resulting file)</p>
+  </body>
+
+  <script>
+    const { PDFDocument } = PDFLib
+
+    async function fillForm() {
+    	// Fetch the PDF with form fields
+	  //const formUrl = 'https://pdf-lib.js.org/assets/dod_character.pdf'
+      const formUrl = 'http://localhost:8083/CRDPForm/form_eng_static.pdf'
+      const formPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer())
+
+			// Fetch the Mario image
+
+			// Fetch the emblem image
+      const emblemUrl = 'https://pdf-lib.js.org/assets/mario_emblem.png'
+      const emblemImageBytes = await fetch(emblemUrl).then(res => res.arrayBuffer())
+
+      // Load a PDF with form fields
+      const pdfDoc = await PDFDocument.load(formPdfBytes)
+
+      // Embed the Mario and emblem images
+
+      // Get the form containing all the fields
+      const form = pdfDoc.getForm()
+
+      // Get all fields in the PDF by their names
+      const AppCourtField = form.getTextField('ApplicationCourt')
+	  const AppRegistryField = form.getTextField('ApplicationRegistry')
+	  const TransferredCourtField = form.getTextField('TransferredCourt')
+	  const TransferredRegistryField = form.getTextField('TransferredRegistry')
+	  
+	  //const InvoicedQuarterlyField = form.getTextField('Invoiced Quarterly')
+	  const PrescribedFeesFields = form.getRadioGroup('PrescribedFees').select('InvoicedQuarterly')
+	  const ApplicantGenderFields = form.getRadioGroup('ApplicantGender').select('ApplicantMale')
+	  const ApplicantChoiceFields = form.getRadioGroup('ApplicantChoice').select('Applicant')
+	  //PrescribedFeesFields.select('InvoicedQuarterly')
+	  
+	  const ProvinceField = form.getTextField('Province')
+	  const DateFiledYearField = form.getTextField('DateFiledYear')
+	  const DateMarriageYearField = form.getTextField('DateMarriageYear')
+	  
+	  
+	  const AppSurnameField = form.getTextField('ApplicantSurname')
+      //const characterImageField = form.getButton('CHARACTER IMAGE')
+      //const factionImageField = form.getButton('Faction Symbol Image')
+
+      // Fill in the basic info fields
+      //AppCourtField.setText('1234')
+	  //AppRegistryField.setText('1234')
+	  //TransferredCourtField.setText('1234')
+	  //TransferredRegistryField.setText('1234')
+	  
+	  ProvinceField.setText('oigfds')
+	  DateFiledYearField.setText('1234')
+	  
+	  DateMarriageYearField.setText('1234')
+	  
+      AppSurnameField.setText('williams')
+      //ageField.setText('24 years')
+      //heightField.setText(`5' 1"`)
+      //weightField.setText('196 lbs')
+      //eyesField.setText('blue')
+      //skinField.setText('white')
+      //hairField.setText('brown')
+
+      // Fill the character image field with our Mario image
+      //characterImageField.setImage(marioImage)
+
+      // Fill in the allies field
+      //alliesField.setText(
+      //  [
+      //    `Allies:`,
+      //    `  • Princess Daisy`,
+      //    `  • Princess Peach`,
+      //    `  • Rosalina`,
+      //    `  • Geno`,
+      //    `  • Luigi`,
+      //    `  • Donkey Kong`,
+      //    `  • Yoshi`,
+      //    `  • Diddy Kong`,
+      //    ``,
+      //    `Organizations:`,
+      //    `  • Italian Plumbers Association`,
+      //  ].join('\n'),
+      //)
+
+      // Fill in the faction name field
+      //factionField.setText(`Mario's Emblem`)
+
+      // Fill the faction image field with our emblem image
+      //factionImageField.setImage(emblemImage)
+
+      // Fill in the backstory field
+      //backstoryField.setText(
+      //  `Mario is a fictional character in the Mario video game franchise, owned by Nintendo and created by Japanese video game designer Shigeru Miyamoto. Serving as the company's mascot and the eponymous protagonist of the series, Mario has appeared in over 200 video games since his creation. Depicted as a short, pudgy, Italian plumber who resides in the Mushroom Kingdom, his adventures generally center upon rescuing Princess Peach from the Koopa villain Bowser. His younger brother and sidekick is Luigi.`,
+      //)
+
+      // Fill in the traits field
+      //traitsField.setText(
+      //  [
+      //    `Mario can use three basic three power-ups:`,
+      //    `  • the Super Mushroom, which causes Mario to grow larger`,
+      //    `  • the Fire Flower, which allows Mario to throw fireballs`,
+      //    `  • the Starman, which gives Mario temporary invincibility`,
+      //  ].join('\n'),
+      //)
+
+      // Fill in the treasure field
+      //treasureField.setText(['• Gold coins', '• Treasure chests'].join('\n'))
+
+      // Serialize the PDFDocument to bytes (a Uint8Array)
+	  form.flatten();
+      const pdfBytes = await pdfDoc.save()
+
+			// Trigger the browser to download the PDF document
+      download(pdfBytes, "pdf-lib_form_creation_example.pdf", "application/pdf");
+    }
+  </script>
+</html>
