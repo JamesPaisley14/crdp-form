@@ -17,7 +17,7 @@
     async function fillForm() {
     	// Fetch the PDF with form fields
 	  //const formUrl = 'https://pdf-lib.js.org/assets/dod_character.pdf'
-      const formUrl = 'http://localhost:8083/CRDPForm/form_eng_static.pdf'
+      const formUrl = './form_eng_static.pdf'
       const formPdfBytes = await fetch(formUrl).then(res => res.arrayBuffer())
 
 			// Fetch the Mario image
