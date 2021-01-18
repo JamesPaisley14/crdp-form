@@ -16234,6 +16234,16 @@
             }
             throw new UnexpectedObjectTypeError(types, result);
         };
+        PDFContext.prototype.getObjectRef = function (pdfObject) {
+            var entries = Array.from(this.indirectObjects.entries());
+            for (var idx = 0, len = entries.length; idx < len; idx++) {
+                var _a = entries[idx], ref = _a[0], object = _a[1];
+                if (object === pdfObject) {
+                    return ref;
+                }
+            }
+            return undefined;
+        };
         PDFContext.prototype.enumerateIndirectObjects = function () {
             return Array.from(this.indirectObjects.entries()).sort(byAscendingObjectNumber);
         };
@@ -16404,6 +16414,13 @@
         PDFPageLeaf.prototype.addAnnot = function (annotRef) {
             var Annots = this.normalizedEntries().Annots;
             Annots.push(annotRef);
+        };
+        PDFPageLeaf.prototype.removeAnnot = function (annotRef) {
+            var Annots = this.normalizedEntries().Annots;
+            var index = Annots.indexOf(annotRef);
+            if (index !== undefined) {
+                Annots.remove(index);
+            }
         };
         PDFPageLeaf.prototype.setFontDictionary = function (name, fontDictRef) {
             var Font = this.normalizedEntries().Font;
@@ -27231,6 +27248,12 @@
             var Rect = this.dict.context.obj([x, y, x + width, y + height]);
             this.dict.set(PDFName.of('Rect'), Rect);
         };
+        PDFAnnotation.prototype.getAppearanceState = function () {
+            var AS = this.dict.lookup(PDFName.of('AS'));
+            if (AS instanceof PDFName)
+                return AS;
+            return undefined;
+        };
         PDFAnnotation.prototype.setAppearanceState = function (state) {
             this.dict.set(PDFName.of('AS'), state);
         };
@@ -28328,10 +28351,15 @@
             Fields === null || Fields === void 0 ? void 0 : Fields.push(field);
         };
         PDFAcroForm.prototype.removeField = function (field) {
-            var Fields = this.normalizedEntries().Fields;
-            var index = Fields === null || Fields === void 0 ? void 0 : Fields.indexOf(field);
-            if (index !== undefined) {
-                Fields.remove(index);
+            var parent = field.getParent();
+            var fields = parent === undefined ? this.normalizedEntries().Fields : parent.Kids();
+            var index = fields === null || fields === void 0 ? void 0 : fields.indexOf(field.ref);
+            if (fields === undefined || index === undefined) {
+                throw new Error("Tried to remove inexistent field " + field.getFullyQualifiedName());
+            }
+            fields.remove(index);
+            if (parent !== undefined && fields.size() === 0) {
+                this.removeField(parent);
             }
         };
         PDFAcroForm.prototype.normalizedEntries = function () {
@@ -32166,6 +32194,7 @@
             var y = options.y;
             var width = options.width + borderWidth;
             var height = options.height + borderWidth;
+            var hidden = Boolean(options.hidden);
             assertMultiple(degreesAngle, 'degreesAngle', 90);
             // Create a widget for this field
             var widget = PDFWidgetAnnotation.create(this.doc.context, this.ref);
@@ -32185,7 +32214,7 @@
             if (borderWidth !== undefined)
                 bs.setWidth(borderWidth);
             widget.setFlagTo(exports.AnnotationFlags.Print, true);
-            widget.setFlagTo(exports.AnnotationFlags.Hidden, false);
+            widget.setFlagTo(exports.AnnotationFlags.Hidden, hidden);
             widget.setFlagTo(exports.AnnotationFlags.Invisible, false);
             // Set acrofield properties
             if (textColor) {
@@ -32452,6 +32481,7 @@
                 borderColor: options.borderColor,
                 borderWidth: (_e = options.borderWidth) !== null && _e !== void 0 ? _e : 0,
                 rotate: (_f = options.rotate) !== null && _f !== void 0 ? _f : degrees(0),
+                hidden: options.hidden,
             });
             var widgetRef = this.doc.context.register(widget.dict);
             // Add widget to this field
@@ -32476,9 +32506,12 @@
             var widgets = this.acroField.getWidgets();
             for (var idx = 0, len = widgets.length; idx < len; idx++) {
                 var widget = widgets[idx];
-                var value = this.acroField.getValue();
+                var state = widget.getAppearanceState();
                 var normal = (_a = widget.getAppearances()) === null || _a === void 0 ? void 0 : _a.normal;
-                return !(normal instanceof PDFDict && normal.has(value));
+                if (!(normal instanceof PDFDict))
+                    return true;
+                if (state && !normal.has(state))
+                    return true;
             }
             return false;
         };
@@ -32986,6 +33019,7 @@
                 borderColor: options.borderColor,
                 borderWidth: (_e = options.borderWidth) !== null && _e !== void 0 ? _e : 0,
                 rotate: (_f = options.rotate) !== null && _f !== void 0 ? _f : degrees(0),
+                hidden: options.hidden,
             });
             var widgetRef = this.doc.context.register(widget.dict);
             // Add widget to this field
@@ -33435,6 +33469,7 @@
                 borderColor: options.borderColor,
                 borderWidth: (_e = options.borderWidth) !== null && _e !== void 0 ? _e : 0,
                 rotate: (_f = options.rotate) !== null && _f !== void 0 ? _f : degrees(0),
+                hidden: options.hidden,
             });
             var widgetRef = this.doc.context.register(widget.dict);
             // Add widget to this field
@@ -33839,6 +33874,7 @@
                 borderColor: (_g = options === null || options === void 0 ? void 0 : options.borderColor) !== null && _g !== void 0 ? _g : rgb(0, 0, 0),
                 borderWidth: (_h = options === null || options === void 0 ? void 0 : options.borderWidth) !== null && _h !== void 0 ? _h : 1,
                 rotate: (_j = options === null || options === void 0 ? void 0 : options.rotate) !== null && _j !== void 0 ? _j : degrees(0),
+                hidden: options === null || options === void 0 ? void 0 : options.hidden,
             });
             var widgetRef = this.doc.context.register(widget.dict);
             // Add widget to this field
@@ -33863,13 +33899,14 @@
             var widgets = this.acroField.getWidgets();
             for (var idx = 0, len = widgets.length; idx < len; idx++) {
                 var widget = widgets[idx];
-                var value = this.acroField.getValue();
+                var state = widget.getAppearanceState();
                 var normal = (_a = widget.getAppearances()) === null || _a === void 0 ? void 0 : _a.normal;
-                if (normal instanceof PDFDict && normal.has(value)) {
-                    return false;
-                }
+                if (!(normal instanceof PDFDict))
+                    return true;
+                if (state && !normal.has(state))
+                    return true;
             }
-            return true;
+            return false;
         };
         /**
          * Update the appearance streams for each of this group's radio button widgets
@@ -34552,6 +34589,7 @@
                 borderColor: options.borderColor,
                 borderWidth: (_e = options.borderWidth) !== null && _e !== void 0 ? _e : 0,
                 rotate: (_f = options.rotate) !== null && _f !== void 0 ? _f : degrees(0),
+                hidden: options.hidden,
             });
             var widgetRef = this.doc.context.register(widget.dict);
             // Add widget to this field
@@ -35116,7 +35154,7 @@
          * ```
          */
         PDFForm.prototype.flatten = function (options) {
-            var _a, _b;
+            var _a;
             if (options === void 0) { options = { updateFieldAppearances: true }; }
             if (options.updateFieldAppearances) {
                 this.updateFieldAppearances();
@@ -35131,7 +35169,14 @@
                     var pageRef = widget.P();
                     var page = pages.find(function (x) { return x.ref === pageRef; });
                     if (page === undefined) {
-                        throw new Error("Failed to find page " + pageRef + " for element " + field.getName());
+                        var widgetRef = this_1.doc.context.getObjectRef(widget.dict);
+                        if (widgetRef === undefined) {
+                            throw new Error('Could not find PDFRef for PDFObject');
+                        }
+                        page = this_1.doc.findPageForAnnotationRef(widgetRef);
+                        if (page === undefined) {
+                            throw new Error("Could not find page for PDFRef " + widgetRef);
+                        }
                     }
                     var refOrDict = widget.getNormalAppearance();
                     if (refOrDict instanceof PDFDict &&
@@ -35142,29 +35187,43 @@
                             refOrDict = ref;
                         }
                     }
-                    /*if (!(refOrDict instanceof PDFRef)) {
-                        throw new Error("Failed to extract appearance ref");
-                    }*/
+                    if (!(refOrDict instanceof PDFRef)) {
+                        var name_1 = field.getName();
+                        throw new Error("Failed to extract appearance ref for: " + name_1);
+                    }
                     var xObjectKey = addRandomSuffix('FlatWidget', 10);
                     page.node.setXObject(PDFName.of(xObjectKey), refOrDict);
-                    var ap = widget.getAppearanceCharacteristics();
                     var rectangle = widget.getRectangle();
-                    var rotation = degrees((_b = ap === null || ap === void 0 ? void 0 : ap.getRotation()) !== null && _b !== void 0 ? _b : 0);
-                    var operators = [
+                    var operators = __spreadArrays([
                         pushGraphicsState(),
-                        translate(rectangle.x, rectangle.y),
-                        rotateRadians(toRadians(rotation)),
+                        translate(rectangle.x, rectangle.y)
+                    ], rotateInPlace(__assign(__assign({}, rectangle), { rotation: 0 })), [
                         drawObject(xObjectKey),
                         popGraphicsState(),
-                    ].filter(Boolean);
+                    ]).filter(Boolean);
                     page.pushOperators.apply(page, operators);
+                    page.node.removeAnnot(refOrDict);
                 };
+                var this_1 = this;
                 for (var j = 0, lenWidgets = widgets.length; j < lenWidgets; j++) {
                     _loop_1(j, lenWidgets);
                 }
-                this.acroForm.removeField(field.ref);
-                this.doc.context.delete(field.ref);
+                this.removeField(field);
             }
+        };
+        /**
+         * Remove a field from this [[PDFForm]].
+         *
+         * For example:
+         * ```js
+         * const form = pdfDoc.getForm();
+         * const ageField = form.getFields().find(x => x.getName() === 'Age');
+         * form.removeField(ageField);
+         * ```
+         */
+        PDFForm.prototype.removeField = function (field) {
+            this.acroForm.removeField(field.acroField);
+            this.doc.context.delete(field.ref);
         };
         /**
          * Update the appearance streams for all widgets of all fields in this
@@ -36820,6 +36879,17 @@
                 });
             });
         };
+        PDFDocument.prototype.findPageForAnnotationRef = function (ref) {
+            var pages = this.getPages();
+            for (var idx = 0, len = pages.length; idx < len; idx++) {
+                var page = pages[idx];
+                var annotations = page.node.Annots();
+                if ((annotations === null || annotations === void 0 ? void 0 : annotations.indexOf(ref)) !== undefined) {
+                    return page;
+                }
+            }
+            return undefined;
+        };
         PDFDocument.prototype.embedAll = function (embeddables) {
             return __awaiter(this, void 0, void 0, function () {
                 var idx, len;
@@ -38298,6 +38368,7 @@
                 borderWidth: (_j = options === null || options === void 0 ? void 0 : options.borderWidth) !== null && _j !== void 0 ? _j : 0,
                 rotate: (_k = options === null || options === void 0 ? void 0 : options.rotate) !== null && _k !== void 0 ? _k : degrees(0),
                 caption: text,
+                hidden: options === null || options === void 0 ? void 0 : options.hidden,
             });
             var widgetRef = this.doc.context.register(widget.dict);
             // Add widget to this field
